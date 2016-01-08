@@ -28,6 +28,18 @@ class Filter(object):
         self.axes = np.arange(len(Fkernel.shape) - 2) + 1
         self.Fkernel = Fkernel
 
+    
+    def _is_complex_kernel(self, kernel):
+        """
+        Checks if the kernel is complex or real. (Predicate)
+        """
+        return (kernel.dtype.name == 'cfloat' or 
+                kernel.dtype.name == 'csingle' or 
+                kernel.dtype.name == 'clongfloat' or 
+                kernel.dtype.name == 'complex64' or 
+                kernel.dtype.name == 'complex128')
+
+
     def _frequency_2_real(self):
         """
         Converts the kernel from frequency space to real space with
@@ -35,8 +47,12 @@ class Filter(object):
 
         Returns:
           an array in real space
-        """
-        return np.real_if_close(np.fft.fftshift(np.fft.ifftn(self.Fkernel,
+        """ 
+        if self._is_complex_kernel(self.Fkernel):
+            return np.real_if_close(np.fft.fftshift(np.fft.ifftn(self.Fkernel,
+                                                                 axes=self.axes),
+                                                    axes=self.axes))
+        return np.real_if_close(np.fft.fftshift(np.fft.irfftn(self.Fkernel,
                                                              axes=self.axes),
                                                 axes=self.axes))
 
@@ -50,8 +66,11 @@ class Filter(object):
         Returns:
           an array in frequency space
         """
-        return np.fft.fftn(np.fft.ifftshift(kernel, axes=self.axes),
-                           axes=self.axes)
+        if self._is_complex_kernel(kernel):    
+            return np.fft.fftn(np.fft.ifftshift(kernel, axes=self.axes),
+                               axes=self.axes)
+        return np.fft.rfftn(np.fft.ifftshift(kernel, axes=self.axes),
+                            axes=self.axes)
 
     def convolve(self, X):
         """
@@ -63,11 +82,18 @@ class Filter(object):
         Returns:
           convolution of X with the kernel
         """
-        if X.shape[1:] != self.Fkernel.shape[1:]:
-            raise RuntimeError("Dimensions of X are incorrect.")
-        FX = np.fft.fftn(X, axes=self.axes)
-        Fy = self._sum(FX * self.Fkernel)
-        return np.fft.ifftn(Fy, axes=self.axes).real
+        #if X.shape[1:] != self.Fkernel.shape[1:]:
+        #    raise RuntimeError("Dimensions of X are incorrect.")
+        if self._is_complex_kernel(X):
+            FX = np.fft.fftn(X, axes=self.axes)
+            print "X is comp", FX.shape, self.Fkernel.shape
+            Fy = self._sum(FX * self.Fkernel)
+            return np.fft.ifftn(Fy, axes=self.axes).real
+        else:
+            FX = np.fft.rfftn(X, axes=self.axes)
+            print "X is real", FX.shape, self.Fkernel.shape
+            Fy = self._sum(FX * self.Fkernel) 
+            return np.fft.irfftn(Fy, axes=self.axes)
 
     def _sum(self, Fy):
         return np.sum(Fy, axis=-1)
@@ -85,6 +111,7 @@ class Filter(object):
             raise RuntimeError("resize shape is too small.")
 
         kernel = self._frequency_2_real()
+        print "RESIZE:", self._is_complex_kernel(kernel)
         size = kernel.shape[:1] + size + kernel.shape[-1:]
         padsize = np.array(size) - np.array(kernel.shape)
         paddown = padsize // 2

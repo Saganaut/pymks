@@ -124,6 +124,38 @@ def test_nonperiodic_correlate():
     assert(np.allclose(X_result, X_corr[0, ..., 0]))
 
 
+def test_complex_correlate():
+    '''
+    test correlate for complex microstructures
+    '''
+    from pymks import DiscreteIndicatorBasis
+    from pymks.stats import correlate
+
+    X = np.array([[[0, 0, 1, 0],
+                   [0, 0, 1, 0],
+                   [0, 0, 1, 0],
+                   [0, 0, 0, 0],
+                   [0, 0, 1, 0]],
+                  [[0, 1, 0, 0],
+                   [0, 1, 0, 0],
+                   [0, 1, 0, 0],
+                   [0, 0, 0, 0],
+                   [0, 1, 0, 0]]])
+    basis = DiscreteIndicatorBasis(n_states=2)
+    X_ = basis.discretize(X)
+    X_ = np.array([[[[1j,0],
+                     [1j,0]],
+                    [[1j,0],
+                     [1j,0]]],
+                   [[[1j,0],
+                     [1j,0]],
+                    [[1j,0],
+                     [1j,0]]]])
+    X_corr = correlate(X_, periodic_axes=(0, 1))
+    X_result = np.ones((2,2))
+    assert(np.allclose(X_result, X_corr[0, ..., 0]))
+
+
 def test_periodic_correlate():
     '''
     test corrleate for non-periodic microstructures
@@ -266,3 +298,5 @@ if __name__ == '__main__':
     test_nonperiodic_crosscorrelation()
     test_periodic_autocorrelation()
     test_nonperiodic_autocorrelation()
+    test_complex_correlate()
+    
